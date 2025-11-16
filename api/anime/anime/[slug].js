@@ -1,40 +1,13 @@
 export default async function handler(req, res) {
+  const { slug } = req.query;
   try {
-    const { slug } = req.query;
-    const target = `https://otakudesu.best/anime/${slug}/`;
-
-    const html = await fetch(target, {
-      method: "GET",
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-        "Upgrade-Insecure-Requests": "1",
-        "Referer": "https://otakudesu.best/"
-      }
-    }).then(r => r.text());
-
-    // TITLE
-    const title = (html.match(/<h1[^>]*>(.*?)<\/h1>/)?.[1] || "").trim();
-
-    // IMAGE
-    const image =
-      html.match(/<img[^>]+src="([^"]+)"[^>]*class="attachment-post-thumbnail"/)?.[1] ||
-      "";
-
-    // SYNOPSIS
-    const synopsis =
-      html.match(/<div class="deskrip">[\s\S]*?<p>([\s\S]*?)<\/p>/)?.[1]
-        ?.replace(/<[^>]+>/g, "")
-        ?.trim() || "";
-
-    // GENRES
-    const genres = [...html.matchAll(/\/genre\/([^"]+)"/g)].map(m => m[1]);
-
-    // EPISODES
+    const r = await fetch(`https://sankavollerei.com/anime/anime/${slug}`);
+    const data = await r.json();
+    res.status(200).json({ success: true, data });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.toString() });
+  }
+}    // EPISODES
     const episodes = [...html.matchAll(/<a href="([^"]+)"[^>]*class="epsleft">([^<]+)<\/a>/g)]
       .map(m => ({
         url: m[1],
