@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { load } from 'cheerio';
 
-export const SITE = process.env.OT_SITE || 'https://otakudesu.id';
+export const SITE = 'https://otakudesu.best';
 
 const cache = new Map();
 
