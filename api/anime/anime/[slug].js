@@ -2,7 +2,14 @@ export const dynamic = "force-dynamic";
 
 export default async function handler(req, res) {
   try {
-    const { slug } = req.query;
+    let { slug } = req.query;
+
+    // ==============================
+    // FIX: Bersihkan slug (kalau full URL)
+    // ==============================
+    if (slug.includes("/")) {
+      slug = slug.split("/").filter(Boolean).pop();
+    }
 
     const url = `https://www.sankavollerei.com/anime/anime/${slug}`;
 
@@ -15,17 +22,19 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
-      return res
-        .status(response.status)
-        .json({ success: false, message: "Remote API ERROR" });
+      console.log("REMOTE ERROR", response.status);
+      return res.status(500).json({
+        success: false,
+        message: `Remote API returned ${response.status}`
+      });
     }
 
     const json = await response.json();
 
-    // Kamu HARUS return { success:true, data:{...} }
+    // Pastikan format cocok dengan frontend
     return res.status(200).json({
       success: true,
-      data: json.data
+      data: json.data || json
     });
 
   } catch (err) {
