@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NeoRead — Futuristic Anime / Manhwa Reader</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-1: #071126;
+  --bg-2: #08132a;
+  --accent-a: #7c3aed;
+  --accent-b: #06b6d4;
+  --glass: rgba(255,255,255,0.06);
+  --muted: rgba(255,255,255,0.6);
+  --card: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  --radius: 14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:'Inter',system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+  background: radial-gradient(1200px 400px at 10% 10%, rgba(124,58,237,0.12), transparent),
+              radial-gradient(900px 300px at 90% 90%, rgba(6,182,212,0.08), transparent),
+              linear-gradient(180deg,var(--bg-1),var(--bg-2));
+  color:#fff;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  padding:28px 20px;
+}
+
+/* Container */
+.container{max-width:1200px;margin:0 auto}
+
+/* Header */
+.header{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  justify-content:space-between;
+  margin-bottom:22px;
+}
+.brand{
+  display:flex;align-items:center;gap:12px;
+}
+.logo{
+  width:52px;height:52px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent-a),#5b21b6 60%, var(--accent-b));
+  display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(5,6,15,0.6);
+  border:1px solid rgba(255,255,255,0.04);
+}
+.logo svg{filter:drop-shadow(0 6px 18px rgba(0,0,0,0.6))}
+.brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:0.4px}
+.brand p{margin:0;font-size:12px;color:var(--muted)}
+
+/* Search */
+.searchbar{display:flex;gap:10px;align-items:center}
+.input{
+  background:var(--glass);
+  border:1px solid rgba(255,255,255,0.04);
+  padding:10px 14px;border-radius:12px;color:inherit;min-width:320px;
+  outline:none;font-size:14px;
+  transition:box-shadow .18s ease, transform .12s ease;
+}
+.input:focus{box-shadow:0 6px 30px rgba(7,16,40,0.5);transform:translateY(-1px)}
+.btn{
+  background:linear-gradient(90deg,var(--accent-a),var(--accent-b));
+  color:white;padding:10px 14px;border-radius:12px;border:none;font-weight:600;cursor:pointer;
+  box-shadow:0 8px 30px rgba(6,11,26,0.6);
+}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:18px;margin-top:18px}
+.card{
+  background:var(--card);padding:10px;border-radius:12px;overflow:hidden;cursor:pointer;
+  border:1px solid rgba(255,255,255,0.03);transition:transform .18s ease, box-shadow .18s ease;
+}
+.card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(2,6,23,0.6)}
+.thumb{width:100%;height:220px;object-fit:cover;border-radius:10px;display:block}
+.meta{padding-top:10px}
+.title{font-size:14px;font-weight:700;margin:0}
+.sub{font-size:12px;color:var(--muted);margin-top:6px}
+
+/* Detail panel */
+.detail{
+  margin-top:22px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.03);
+  display:flex;gap:18px;align-items:flex-start;
+}
+.detail .poster{width:220px;border-radius:12px;flex-shrink:0}
+.detail .info{flex:1}
+.genres{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.genre{background:rgba(255,255,255,0.03);padding:6px 10px;border-radius:999px;font-size:12px;color:var(--muted)}
+
+/* Episodes */
+.episodes{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.ep-btn{padding:8px 10px;border-radius:999px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.02);cursor:pointer;font-size:13px}
+.ep-btn:hover{transform:translateY(-3px)}
+
+/* Reader */
+.reader{
+  margin-top:18px;padding:12px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.03)
+}
+.reader img{width:100%;max-width:900px;display:block;margin:12px auto;border-radius:8px;box-shadow:0 18px 40px rgba(3,6,20,0.6)}
+
+/* Footer */
+.footer{margin-top:36px;padding:24px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Responsiveness */
+@media (max-width:720px){
+  .searchbar{flex-direction:column;align-items:stretch}
+  .input{width:100%}
+  .detail{flex-direction:column}
+  .detail .poster{width:100%;height:auto}
+}
+
+/* subtle animated shimmer for loading */
+.shimmer{position:relative;overflow:hidden;background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.04), rgba(255,255,255,0.02));}
+.shimmer::after{content:'';position:absolute;left:-150%;top:0;height:100%;width:150%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.03),transparent);animation:shimmer 1.6s infinite}
+@keyframes shimmer{to{left:150%}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="header">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 12h18M12 3v18" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h1>NeoRead</h1>
+        <p>Futuristic minimal • Anime & Manhwa</p>
+      </div>
+    </div>
+
+    <div class="searchbar">
+      <input id="q" class="input" placeholder="Search anime / manhwa..." />
+      <button id="searchBtn" class="btn">Search</button>
+      <button id="homeBtn" class="btn ghost" title="Home">Home</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="trending">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="margin:0;font-size:18px">Trending Now</h2>
+        <div id="status" style="font-size:13px;color:rgba(255,255,255,0.6)">—</div>
+      </div>
+
+      <div id="grid" class="grid" aria-live="polite" style="margin-top:14px">
+        <!-- cards will be injected here -->
+      </div>
+    </section>
+
+    <section id="detailWrap" style="display:none"></section>
+
+    <section id="readerWrap" style="display:none"></section>
+  </main>
+
+  <footer class="footer">Built with ♥ — NeoRead • Connects to your /api endpoints</footer>
+</div>
+
+<script>
+/*
+  Simple frontend that calls these relative endpoints:
+   - GET /api/anime/home
+   - GET /api/anime/search/:keyword
+   - GET /api/anime/anime/:slug
+   - GET /api/anime/episode/:slug
+
+  When you upload to GitHub Pages or Vercel, make sure your backend is reachable at /api/* or update BASE variable.
+*/
+const BASE = ''; // leave empty to call same-origin /api/*, or set to 'https://your-backend.example' if backend elsewhere
+
+const qs = (s) => document.querySelector(s);
+const grid = qs('#grid');
+const status = qs('#status');
+const detailWrap = qs('#detailWrap');
+const readerWrap = qs('#readerWrap');
+
+async function apiGet(path){
+  try{
+    const res = await fetch(BASE + path);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }catch(e){
+    console.error('apiGet error', e);
+    throw e;
+  }
+}
+
+function toSlugFromUrl(url){
+  if(!url) return url;
+  try{
+    const u = new URL(url, location.origin);
+    const parts = u.pathname.split('/').filter(Boolean);
+    return parts.pop();
+  }catch(e){
+    // fallback
+    const parts = url.split('/').filter(Boolean);
+    return parts.pop();
+  }
+}
+
+function renderCards(items){
+  grid.innerHTML = '';
+  if(!items || !items.length){
+    grid.innerHTML = '<div style="color:var(--muted);padding:30px">No items found.</div>';
+    return;
+  }
+  items.forEach(it=>{
+    const div = document.createElement('div');
+    div.className = 'card';
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.src = it.image || it.imageSrc || it.thumb || it.poster || it.thumbnail || '';
+    img.alt = it.title || it.name || '';
+    if(!img.src) img.classList.add('shimmer');
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML = '<h3 class="title">'+(it.title||it.name||'Untitled')+'</h3><div class="sub">'+(it.chapter||it.latestChapter||'')+'</div>';
+    div.appendChild(img);
+    div.appendChild(meta);
+    div.addEventListener('click', ()=>openDetail(it));
+    grid.appendChild(div);
+  });
+}
+
+async function loadHome(){
+  status.textContent = 'Loading...';
+  try{
+    const json = await apiGet('/api/anime/home');
+    const data = json.data || json;
+    renderCards(data);
+    status.textContent = 'Live';
+  }catch(e){
+    grid.innerHTML = '<div style="color:var(--muted);padding:30px">Failed to load home. Check /api/anime/home</div>';
+    status.textContent = 'Error';
+  }
+}
+
+async function doSearch(){
+  const q = qs('#q').value.trim();
+  if(!q) return loadHome();
+  status.textContent = 'Searching...';
+  try{
+    const json = await apiGet('/api/anime/search/' + encodeURIComponent(q));
+    const data = json.data || json;
+    renderCards(data);
+    status.textContent = 'Results for "'+q+'"';
+  }catch(e){
+    grid.innerHTML = '<div style="color:var(--muted);padding:30px">Search failed.</div>';
+    status.textContent = 'Error';
+  }
+}
+
+function clearDetail(){
+  detailWrap.style.display = 'none';
+  detailWrap.innerHTML = '';
+  readerWrap.style.display = 'none';
+  readerWrap.innerHTML = '';
+  qs('#trending').style.display = '';
+}
+
+function renderDetail(obj){
+  detailWrap.style.display = '';
+  qs('#trending').style.display = 'none';
+  const html = [];
+  const img = obj.image || obj.imageSrc || obj.thumb || '';
+  const title = obj.title || obj.name || '';
+  const synopsis = obj.synopsis || obj.description || obj.summary || '';
+  const genres = (obj.genres && Array.isArray(obj.genres))? obj.genres.map(g => typeof g === 'string' ? g : (g.genreName||g)).filter(Boolean) : [];
+  const episodes = obj.episodes || obj.chapters || obj.list || [];
+  html.push('<div class="detail">');
+  html.push('<img class="poster" src="'+img+'" alt="" />');
+  html.push('<div class="info">');
+  html.push('<h2 style="margin:0 0 8px">'+title+'</h2>');
+  html.push('<div style="color:var(--muted);font-size:13px">'+(obj.type||'')+' • '+(obj.status||'')+'</div>');
+  if(genres.length) html.push('<div class="genres">'+genres.map(g=>'<div class="genre">'+g+'</div>').join('')+'</div>');
+  html.push('<p style="margin-top:12px;color:var(--muted);max-width:70ch;line-height:1.6">'+synopsis+'</p>');
+  if(episodes.length){
+    html.push('<div class="episodes">');
+    episodes.slice(0, 60).forEach(ep=>{
+      const epTitle = ep.chapterNum || ep.epTitle || ep.title || ep.ep_title || ep.name || (ep.url?toSlugFromUrl(ep.url):'Ep');
+      const epUrl = ep.chapterLink || ep.epUrl || ep.url || ep.link || ep.ep_link || ep.ep_slug || '';
+      html.push('<button class="ep-btn" data-ep="'+encodeURIComponent(epUrl)+'" data-label="'+(epTitle)+'">'+(epTitle)+'</button>');
+    });
+    html.push('</div>');
+  } else {
+    html.push('<div style="margin-top:12px;color:var(--muted)">No episodes available.</div>');
+  }
+  html.push('<div style="margin-top:18px"><button class="btn" id="backHome">Back</button></div>');
+  html.push('</div></div>');
+  detailWrap.innerHTML = html.join('');
+  // attach events
+  qs('#backHome').addEventListener('click', clearDetail);
+  detailWrap.querySelectorAll('.ep-btn').forEach(b=>{
+    b.addEventListener('click', async (e)=>{
+      const epUrl = decodeURIComponent(b.getAttribute('data-ep')||'');
+      const label = b.getAttribute('data-label')||'Episode';
+      if(!epUrl) { alert('Episode URL not available'); return; }
+      await openReader(epUrl, label);
+    });
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function openDetail(item){
+  try{
+    const slug = item.slug || item.url || item.link || toSlugFromUrl(item.imageLink||item.chapterLink||item.epUrl||item.url);
+    if(!slug){
+      // if item contains direct fields (already detail)
+      if(item.title && (item.synopsis || item.episodes)) return renderDetail(item);
+      alert('No slug found');
+      return;
+    }
+    // If slug is a full URL, make it relative to /api/anime/anime/:slug
+    const s = slug.includes('/') ? toSlugFromUrl(slug) : slug;
+    status.textContent = 'Loading detail...';
+    const json = await apiGet('/api/anime/anime/' + encodeURIComponent(s));
+    const data = json.data || json;
+    renderDetail(data);
+    status.textContent = 'Detail loaded';
+  }catch(e){
+    console.error(e);
+    alert('Failed to load detail');
+    status.textContent = 'Error';
+  }
+}
+
+async function openReader(epSlugOrUrl, label){
+  try{
+    status.textContent = 'Loading episode...';
+    // extract slug if URL
+    const slug = epSlugOrUrl.includes('/') ? toSlugFromUrl(epSlugOrUrl) : epSlugOrUrl;
+    const json = await apiGet('/api/anime/episode/' + encodeURIComponent(slug));
+    const data = json.images || json.data?.images || json.data || [];
+    readerWrap.style.display = '';
+    readerWrap.innerHTML = '<div class="reader"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">'+label+'</h3><div><button class="btn ghost" id="closeReader">Close</button></div></div><div id="readerImages"></div></div>';
+    const container = qs('#readerImages');
+    if(!data || !data.length){ container.innerHTML = '<div style="color:var(--muted);padding:30px">No images found for this episode.</div>'; return; }
+    data.forEach(src=>{
+      const img = document.createElement('img');
+      img.src = src.startsWith('http') ? src : src.replace(/^\/+/, location.origin + '/');
+      container.appendChild(img);
+    });
+    qs('#closeReader').addEventListener('click', ()=>{
+      readerWrap.style.display = 'none';
+      readerWrap.innerHTML = '';
+    });
+    window.scrollTo({top:0,behavior:'smooth'});
+    status.textContent = 'Episode ready';
+  }catch(e){
+    console.error(e);
+    alert('Failed to load episode');
+    status.textContent = 'Error';
+  }
+}
+
+// events
+qs('#searchBtn').addEventListener('click', doSearch);
+qs('#homeBtn').addEventListener('click', ()=>{qs('#q').value=''; loadHome();});
+qs('#q').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doSearch(); }});
+
+// initial
+loadHome();
+</script>
+</body>
+</html>
