@@ -8,15 +8,25 @@ export default async function handler(req, res) {
 
     const results = [];
 
-    // KHUSUS otakudesu.best
-    $('.venz li, .animepost, .animposx').each((i, el) => {
-      const link = $(el).find('a').attr('href');
-      const title = $(el).find('h2').text().trim();
-      const image = $(el).find('img').attr('src');
-      const chapter = $(el).find('span').first().text().trim();
+    $('.venz ul li').each((i, el) => {
+      const parent = $(el).find('.detpost');
+
+      const link = parent.find('.thumb a').attr('href');
+      const title = parent.find('.thumbz h2.jdlflm').text().trim();
+      const image = parent.find('.thumbz img').attr('src');
+      const episode = parent.find('.epz').text().trim();
+      const day = parent.find('.epztipe').text().trim();
+      const date = parent.find('.newnime').text().trim();
 
       if (title && link) {
-        results.push({ title, link, image, chapter });
+        results.push({
+          title,
+          link,
+          image,
+          episode,
+          day,
+          date
+        });
       }
     });
 
