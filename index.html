@@ -310,23 +310,35 @@ function renderDetail(obj){
 
 async function openDetail(item){
   try{
-    const slug = item.slug || item.url || item.link || toSlugFromUrl(item.imageLink||item.chapterLink||item.epUrl||item.url);
+    // Ambil slug yang valid
+    let slug = item.slug || item.url || item.link || toSlugFromUrl(item.imageLink || item.chapterLink || item.epUrl || item.url);
+
     if(!slug){
-      // if item contains direct fields (already detail)
-      if(item.title && (item.synopsis || item.episodes)) return renderDetail(item);
-      alert('No slug found');
+      alert('Slug tidak ditemukan.');
       return;
     }
-    // If slug is a full URL, make it relative to /api/anime/anime/:slug
-    const s = slug.includes('/') ? toSlugFromUrl(slug) : slug;
+
+    // Jika slug berbentuk URL → ambil yang terakhir
+    slug = slug.includes('/') ? toSlugFromUrl(slug) : slug;
+
     status.textContent = 'Loading detail...';
-    const json = await apiGet('/api/anime/anime/' + encodeURIComponent(s));
-    const data = json.data || json;
+
+    // CALL API FIX
+    const json = await apiGet('/api/anime/anime/' + encodeURIComponent(slug));
+
+    // Your API returns { success, data }
+    const data = json.data;
+
+    if(!data){
+      alert('Data detail kosong');
+      return;
+    }
+
     renderDetail(data);
     status.textContent = 'Detail loaded';
   }catch(e){
-    console.error(e);
-    alert('Failed to load detail');
+    console.error('openDetail error:', e);
+    alert('Failed to load detail: ' + e.message);
     status.textContent = 'Error';
   }
 }
@@ -334,28 +346,51 @@ async function openDetail(item){
 async function openReader(epSlugOrUrl, label){
   try{
     status.textContent = 'Loading episode...';
-    // extract slug if URL
-    const slug = epSlugOrUrl.includes('/') ? toSlugFromUrl(epSlugOrUrl) : epSlugOrUrl;
+
+    // handle URL full
+    let slug = epSlugOrUrl.includes('/') ? toSlugFromUrl(epSlugOrUrl) : epSlugOrUrl;
+
+    // CALL API EPISODE FIX
     const json = await apiGet('/api/anime/episode/' + encodeURIComponent(slug));
-    const data = json.images || json.data?.images || json.data || [];
+
+    const data = json.images || json.data?.images;
+
     readerWrap.style.display = '';
-    readerWrap.innerHTML = '<div class="reader"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">'+label+'</h3><div><button class="btn ghost" id="closeReader">Close</button></div></div><div id="readerImages"></div></div>';
+    readerWrap.innerHTML = `
+      <div class="reader">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3 style="margin:0">${label}</h3>
+          <button class="btn ghost" id="closeReader">Close</button>
+        </div>
+        <div id="readerImages"></div>
+      </div>
+    `;
+
     const container = qs('#readerImages');
-    if(!data || !data.length){ container.innerHTML = '<div style="color:var(--muted);padding:30px">No images found for this episode.</div>'; return; }
+
+    if(!data || !data.length){
+      container.innerHTML = '<div style="color:var(--muted);padding:30px">No images found.</div>';
+      return;
+    }
+
+    // Append images
     data.forEach(src=>{
       const img = document.createElement('img');
-      img.src = src.startsWith('http') ? src : src.replace(/^\/+/, location.origin + '/');
+      img.src = src;
       container.appendChild(img);
     });
+
     qs('#closeReader').addEventListener('click', ()=>{
       readerWrap.style.display = 'none';
       readerWrap.innerHTML = '';
     });
+
     window.scrollTo({top:0,behavior:'smooth'});
     status.textContent = 'Episode ready';
+
   }catch(e){
-    console.error(e);
-    alert('Failed to load episode');
+    console.error('openReader error:', e);
+    alert('Failed to load episode: ' + e.message);
     status.textContent = 'Error';
   }
 }
