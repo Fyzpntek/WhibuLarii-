@@ -315,84 +315,128 @@ async function doSearch(){
 /* ---------- Detail ---------- */
 async function openDetail(item){
   try{
-    status.textContent = 'Loading detail...';
-    const slug = normalizeSlugFromItem(item);
+    let slug = item.slug || item.url || item.link || toSlugFromUrl(item.otakudesu_url);
+
     if(!slug){
       alert('Slug tidak ditemukan.');
-      status.textContent = 'Error';
       return;
     }
 
-    const pathOptions = [
-      '/anime/anime/' + encodeURIComponent(slug),
-      '/anime/detail/' + encodeURIComponent(slug),
-      '/anime/anime/' + encodeURIComponent(slug) + '/'
-    ];
+    // slug dari api home seharusnya tanpa domain, jadi fix:
+    if(slug.startsWith("http")) slug = toSlugFromUrl(slug);
 
-    const json = await apiGetWithFallback(pathOptions);
-    const data = json.data || json;
+    status.textContent = "Loading detail...";
+
+    const json = await apiGet("/anime/anime/" + encodeURIComponent(slug));
+    const data = json.data;
+
     if(!data){
-      alert('Detail kosong.');
-      status.textContent = 'Error';
+      alert("Data detail kosong");
       return;
     }
 
-    // render
-    const poster = data.poster || data.image || data.cover || '';
-    const title = data.title || data.name || '';
-    const synopsis = data.synopsis || data.description || data.about || '';
-    const episodes = data.episodes || data.list || data.chapter_list || data.chapters || [];
+    renderDetail(data);
+    status.textContent = "Detail loaded";
 
-    const html = [];
-    html.push('<div class="detail">');
-    html.push(`<img class="poster" src="${poster}" alt="" />`);
-    html.push('<div class="info">');
-    html.push(`<h2>${title}</h2>`);
-    html.push(`<div style="color:var(--muted);font-size:13px">${data.type||''} • ${data.status||''}</div>`);
-    if(data.genres && Array.isArray(data.genres) && data.genres.length){
-      html.push('<div class="genres">'+data.genres.map(g=>`<div class="genre">${(g.genreName||g)}</div>`).join('')+'</div>');
+  } catch(e){
+    console.error("DETAIL ERROR:", e);
+    alert("Gagal load detail");
+    status.textContent = "Error";
+  }
+}
+
+function renderDetail(obj){
+  detailWrap.style.display = "";
+  qs("#trending").style.display = "none";
+
+  const episodes = obj.episode_lists || [];  // FIX UTAMA
+  const genres = obj.genres?.map(g => g.name) || [];
+
+  const html = [];
+
+  html.push('<div class="detail">');
+  html.push(`<img class="poster" src="${obj.poster}" alt="poster" />`);
+
+  html.push('<div class="info">');
+  html.push(`<h2>${obj.title}</h2>`);
+  html.push(`<div style="color:var(--muted);font-size:13px">${obj.type} • ${obj.status}</div>`);
+
+  if(genres.length)
+    html.push('<div class="genres">' + genres.map(g=>`<div class="genre">${g}</div>`).join('') + '</div>');
+
+  html.push(`<p style="margin-top:12px;color:var(--muted);line-height:1.6">${obj.synopsis}</p>`);
+
+  // EPISODE LIST
+  if(episodes.length){
+    html.push('<div class="episodes">');
+    episodes.forEach(ep=>{
+      html.push(`
+        <button class="ep-btn" data-ep="${ep.slug}" data-label="${ep.episode}">
+          ${ep.episode}
+        </button>
+      `);
+    });
+    html.push('</div>');
+  } else {
+    html.push('<div style="color:var(--muted);margin-top:12px">Tidak ada episode.</div>');
+  }
+
+  html.push('<div style="margin-top:18px"><button class="btn" id="backHome">Back</button></div>');
+  html.push('</div></div>');
+
+  detailWrap.innerHTML = html.join('');
+
+  qs("#backHome").addEventListener("click", clearDetail);
+
+  detailWrap.querySelectorAll(".ep-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>openReader(btn.dataset.ep, btn.dataset.label));
+  });
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function openReader(epSlug, label){
+  try{
+    status.textContent = "Loading episode...";
+
+    const json = await apiGet("/anime/episode/" + encodeURIComponent(epSlug));
+    const data = json.data || json.images;
+
+    readerWrap.style.display = "";
+    readerWrap.innerHTML = `
+      <div class="reader">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>${label}</h3>
+          <button class="btn ghost" id="closeReader">Close</button>
+        </div>
+        <div id="readerImages"></div>
+      </div>
+    `;
+
+    const container = qs("#readerImages");
+
+    if(!data || !data.images){
+      container.innerHTML = "<div style='color:var(--muted);padding:30px'>Episode kosong.</div>";
+      return;
     }
-    html.push(`<p style="margin-top:12px;color:var(--muted);max-width:70ch;line-height:1.6">${(synopsis||'')}</p>`);
 
-    if(episodes && episodes.length){
-      html.push('<div class="episodes">');
-      episodes.slice(0,200).forEach(ep=>{
-        const epTitle = ep.title || ep.chapterTitle || ep.chapter || ep.name || (ep.label || '');
-        const epLink = ep.link || ep.url || ep.chapterLink || (ep.slug ? ('/anime/episode/' + ep.slug) : '');
-        const epSlug = normalizeSlugFromItem(epLink) || normalizeSlugFromItem(ep) || '';
-        html.push(`<button class="ep-btn" data-ep="${encodeURIComponent(epSlug)}">${epTitle||epSlug||'Episode'}</button>`);
-      });
-      html.push('</div>');
-    } else {
-      html.push('<div style="margin-top:12px;color:var(--muted)">No episodes available.</div>');
-    }
-
-    html.push('<div style="margin-top:18px"><button class="btn" id="backHome">Back</button></div>');
-    html.push('</div></div>');
-
-    detailWrap.innerHTML = html.join('');
-    detailWrap.style.display = '';
-    qs('#trending').style.display = 'none';
-
-    qs('#backHome').addEventListener('click', ()=>{
-      detailWrap.style.display = 'none';
-      detailWrap.innerHTML = '';
-      qs('#trending').style.display = '';
-      window.scrollTo({top:0,behavior:'smooth'});
+    data.images.forEach(url=>{
+      const img = document.createElement("img");
+      img.src = url;
+      container.appendChild(img);
     });
 
-    detailWrap.querySelectorAll('.ep-btn').forEach(b=>{
-      b.addEventListener('click', async ()=>{
-        const epSlug = decodeURIComponent(b.getAttribute('data-ep')||'');
-        await openReader(epSlug, b.textContent || 'Episode');
-      });
+    qs("#closeReader").addEventListener("click", ()=>{
+      readerWrap.style.display = "none";
+      readerWrap.innerHTML = "";
     });
 
-    status.textContent = 'Detail loaded';
-  }catch(e){
-    console.error('openDetail error', e);
-    alert('Failed to load detail.');
-    status.textContent = 'Error';
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    status.textContent = "Episode ready";
+
+  } catch(e){
+    console.error("EPISODE ERROR:", e);
+    alert("Gagal load episode");
   }
 }
 
