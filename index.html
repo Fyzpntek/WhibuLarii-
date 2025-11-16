@@ -139,40 +139,90 @@ body{
       </div>
 
       <div id="grid" class="grid" aria-live="polite" style="margin-top:14px">
+        <!-- cards will be injected here -->
       </div>
     </section>
 
     <section id="detailWrap" style="display:none"></section>
+
     <section id="readerWrap" style="display:none"></section>
   </main>
 
-  <footer class="footer">Built with ♥ — NeoRead</footer>
+  <footer class="footer">Built with ♥ — NeoRead • Otakudesu API (Sankavollerei)</footer>
 </div>
 
 <script>
-const BASE = 'https://www.sankavollerei.com'; 
+/*
+  FINAL NeoRead (API A mode - Otakudesu endpoints)
+  - BASE points to the Otakudesu/Sankavollerei site
+  - Uses canonical endpoints (no /api prefix)
+  - Robust fallback: also tries common variants (/api/..., trailing slash, ?format=json)
+*/
+const BASE = 'https://www.sankavollerei.com';
 
-const qs = (s) => document.querySelector(s);
+// utils
+const qs = s => document.querySelector(s);
 const grid = qs('#grid');
 const status = qs('#status');
 const detailWrap = qs('#detailWrap');
 const readerWrap = qs('#readerWrap');
 
-async function apiGet(path){
-  try{
-    const res = await fetch(BASE + path);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    return await res.json();
-  }catch(e){
-    console.error('apiGet error', e);
-    throw e;
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function tryFetchJson(urls){
+  let lastErr = null;
+  for(const url of urls){
+    try{
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'User-Agent': 'Mozilla/5.0 (NeoRead)'
+        },
+        cache: 'no-store'
+      });
+      if(!res.ok){
+        lastErr = new Error('HTTP '+res.status+' @ '+url);
+        continue;
+      }
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch(e){
+        // try to find JSON substring
+        const m = text.match(/\{[\s\S]*\}/);
+        if(m){
+          try { return JSON.parse(m[0]); } catch(e2){}
+        }
+        lastErr = new Error('Not JSON @ '+url);
+      }
+    }catch(e){
+      lastErr = e;
+    }
+    // small backoff
+    await sleep(180);
   }
+  throw lastErr || new Error('All fetch attempts failed');
+}
+
+async function apiGetWithFallback(pathOptions){
+  // pathOptions: array of path strings beginning with /
+  const urls = [];
+  for(const p of pathOptions){
+    urls.push(BASE + p);
+  }
+  // also try API-prefixed variants as fallback
+  for(const p of pathOptions){
+    urls.push(BASE + '/api' + p);
+    urls.push(BASE + '/api' + p + '/');
+  }
+  // also try query style for search (some servers may accept ?q=)
+  return tryFetchJson(urls);
 }
 
 function toSlugFromUrl(url){
   if(!url) return url;
   try{
-    const u = new URL(url, location.origin);
+    const u = new URL(url, BASE);
     const parts = u.pathname.split('/').filter(Boolean);
     return parts.pop();
   }catch(e){
@@ -181,116 +231,196 @@ function toSlugFromUrl(url){
   }
 }
 
+function normalizeSlugFromItem(item){
+  if(!item) return null;
+  if(typeof item === 'string') return toSlugFromUrl(item);
+  if(item.slug) return (''+item.slug).replace(/^\/+|\/+$/g,'');
+  if(item.otakudesu_url) return toSlugFromUrl(item.otakudesu_url);
+  if(item.link) return toSlugFromUrl(item.link);
+  if(item.url) return toSlugFromUrl(item.url);
+  return null;
+}
+
 function renderCards(items){
   grid.innerHTML = '';
   if(!items || !items.length){
     grid.innerHTML = '<div style="color:var(--muted);padding:30px">No items found.</div>';
     return;
   }
-
   items.forEach(it=>{
     const div = document.createElement('div');
     div.className = 'card';
-
     const img = document.createElement('img');
     img.className = 'thumb';
     img.src = it.poster || it.image || it.thumbnail || '';
-    img.alt = it.title || '';
+    img.alt = it.title || it.name || '';
+    if(!img.src) img.classList.add('shimmer');
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.innerHTML = `<h3 class="title">${it.title}</h3><div class="sub">${it.current_episode||''}</div>`;
+    meta.innerHTML = '<h3 class="title">'+(it.title||it.name||'Untitled')+'</h3><div class="sub">'+(it.current_episode||it.latestEpisode||'')+'</div>';
 
     div.appendChild(img);
     div.appendChild(meta);
-
-    div.addEventListener('click', ()=>openDetail(it.slug));
-
+    div.addEventListener('click', ()=>openDetail(it));
     grid.appendChild(div);
   });
 }
 
+/* ---------- Home ---------- */
 async function loadHome(){
   status.textContent = 'Loading...';
   try{
-    const json = await apiGet('/anime/home');
-    renderCards(json.data.ongoing_anime);
+    // Primary patterns for API A
+    const json = await apiGetWithFallback([
+      '/anime/home',
+      '/anime/home?format=json',
+      '/anime/home/'
+    ]);
+    const d = json.data || json;
+    // many responses have data.ongoing_anime
+    const items = d.ongoing_anime || (Array.isArray(d) ? d : (d.items || d.results || []));
+    renderCards(items);
     status.textContent = 'Live';
   }catch(e){
+    console.error('loadHome error', e);
     grid.innerHTML = '<div style="color:var(--muted);padding:30px">Failed to load home.</div>';
     status.textContent = 'Error';
   }
 }
 
+/* ---------- Search ---------- */
 async function doSearch(){
   const q = qs('#q').value.trim();
   if(!q) return loadHome();
-
   status.textContent = 'Searching...';
-
   try{
-    const json = await apiGet('/anime/search/' + encodeURIComponent(q));
-    renderCards(json.data);
+    // try both patterns: /anime/search/:keyword and /anime/search?q=
+    const json = await apiGetWithFallback([
+      '/anime/search/' + encodeURIComponent(q),
+      '/anime/search/' + encodeURIComponent(q) + '/',
+      '/anime/search?q=' + encodeURIComponent(q)
+    ]);
+    const d = json.data || json;
+    const items = Array.isArray(d) ? d : (d.results || d.animes || d.items || []);
+    renderCards(items);
     status.textContent = `Results for "${q}"`;
   }catch(e){
+    console.error('search error', e);
     grid.innerHTML = '<div style="color:var(--muted);padding:30px">Search failed.</div>';
     status.textContent = 'Error';
   }
 }
 
-async function openDetail(slug){
+/* ---------- Detail ---------- */
+async function openDetail(item){
   try{
     status.textContent = 'Loading detail...';
+    const slug = normalizeSlugFromItem(item);
+    if(!slug){
+      alert('Slug tidak ditemukan.');
+      status.textContent = 'Error';
+      return;
+    }
 
-    const json = await apiGet('/anime/anime/' + slug);
-    const obj = json.data;
+    const pathOptions = [
+      '/anime/anime/' + encodeURIComponent(slug),
+      '/anime/detail/' + encodeURIComponent(slug),
+      '/anime/anime/' + encodeURIComponent(slug) + '/'
+    ];
+
+    const json = await apiGetWithFallback(pathOptions);
+    const data = json.data || json;
+    if(!data){
+      alert('Detail kosong.');
+      status.textContent = 'Error';
+      return;
+    }
+
+    // render
+    const poster = data.poster || data.image || data.cover || '';
+    const title = data.title || data.name || '';
+    const synopsis = data.synopsis || data.description || data.about || '';
+    const episodes = data.episodes || data.list || data.chapter_list || data.chapters || [];
 
     const html = [];
     html.push('<div class="detail">');
-    html.push(`<img class="poster" src="${obj.poster}" />`);
+    html.push(`<img class="poster" src="${poster}" alt="" />`);
     html.push('<div class="info">');
-    html.push(`<h2>${obj.title}</h2>`);
-    html.push(`<p style="color:var(--muted)">${obj.synopsis}</p>`);
+    html.push(`<h2>${title}</h2>`);
+    html.push(`<div style="color:var(--muted);font-size:13px">${data.type||''} • ${data.status||''}</div>`);
+    if(data.genres && Array.isArray(data.genres) && data.genres.length){
+      html.push('<div class="genres">'+data.genres.map(g=>`<div class="genre">${(g.genreName||g)}</div>`).join('')+'</div>');
+    }
+    html.push(`<p style="margin-top:12px;color:var(--muted);max-width:70ch;line-height:1.6">${(synopsis||'')}</p>`);
 
-    html.push('<div class="episodes">');
-    obj.episodes.forEach(ep=>{
-      html.push(`<button class="ep-btn" data-link="${ep.link}">${ep.title}</button>`);
-    });
-    html.push('</div>');
+    if(episodes && episodes.length){
+      html.push('<div class="episodes">');
+      episodes.slice(0,200).forEach(ep=>{
+        const epTitle = ep.title || ep.chapterTitle || ep.chapter || ep.name || (ep.label || '');
+        const epLink = ep.link || ep.url || ep.chapterLink || (ep.slug ? ('/anime/episode/' + ep.slug) : '');
+        const epSlug = normalizeSlugFromItem(epLink) || normalizeSlugFromItem(ep) || '';
+        html.push(`<button class="ep-btn" data-ep="${encodeURIComponent(epSlug)}">${epTitle||epSlug||'Episode'}</button>`);
+      });
+      html.push('</div>');
+    } else {
+      html.push('<div style="margin-top:12px;color:var(--muted)">No episodes available.</div>');
+    }
+
+    html.push('<div style="margin-top:18px"><button class="btn" id="backHome">Back</button></div>');
     html.push('</div></div>');
 
     detailWrap.innerHTML = html.join('');
     detailWrap.style.display = '';
-
     qs('#trending').style.display = 'none';
 
+    qs('#backHome').addEventListener('click', ()=>{
+      detailWrap.style.display = 'none';
+      detailWrap.innerHTML = '';
+      qs('#trending').style.display = '';
+      window.scrollTo({top:0,behavior:'smooth'});
+    });
+
     detailWrap.querySelectorAll('.ep-btn').forEach(b=>{
-      b.addEventListener('click',()=>{
-        openReader(toSlugFromUrl(b.dataset.link), b.textContent);
+      b.addEventListener('click', async ()=>{
+        const epSlug = decodeURIComponent(b.getAttribute('data-ep')||'');
+        await openReader(epSlug, b.textContent || 'Episode');
       });
     });
 
     status.textContent = 'Detail loaded';
-
   }catch(e){
+    console.error('openDetail error', e);
     alert('Failed to load detail.');
     status.textContent = 'Error';
   }
 }
 
-async function openReader(slug, label){
+/* ---------- Reader ---------- */
+async function openReader(epSlug, label){
   try{
     status.textContent = 'Loading episode...';
+    if(!epSlug){
+      alert('Episode slug tidak tersedia.');
+      status.textContent = 'Error';
+      return;
+    }
 
-    const json = await apiGet('/anime/episode/' + slug);
+    const pathOptions = [
+      '/anime/episode/' + encodeURIComponent(epSlug),
+      '/anime/episode/' + encodeURIComponent(epSlug) + '/',
+      '/anime/episode/' + encodeURIComponent(epSlug) + '?format=json'
+    ];
 
-    const data = json.data || [];
+    const json = await apiGetWithFallback(pathOptions);
+    const payload = json.data || json;
+    const images = payload.images || payload.image_list || payload.pages || payload.images_list || [];
 
     readerWrap.style.display = '';
     readerWrap.innerHTML = `
       <div class="reader">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <h3>${label}</h3>
+          <h3 style="margin:0">${label}</h3>
           <button class="btn ghost" id="closeReader">Close</button>
         </div>
         <div id="readerImages"></div>
@@ -298,37 +428,44 @@ async function openReader(slug, label){
     `;
 
     const container = qs('#readerImages');
+    container.innerHTML = '';
 
-    if(!data.images || !data.images.length){
-      container.innerHTML = '<div style="color:var(--muted);padding:30px">No images found.</div>';
+    if(!images || !images.length){
+      container.innerHTML = '<div style="color:var(--muted);padding:30px">No images found for this episode.</div>';
       return;
     }
 
-    data.images.forEach(src=>{
+    images.forEach(src=>{
       const img = document.createElement('img');
-      img.src = src;
+      if(!src) return;
+      if(src.startsWith('//')) img.src = 'https:' + src;
+      else if(src.startsWith('/')) img.src = BASE + src;
+      else img.src = src;
       container.appendChild(img);
     });
 
-    qs('#closeReader').addEventListener('click',()=>{
+    qs('#closeReader').addEventListener('click', ()=>{
       readerWrap.style.display = 'none';
       readerWrap.innerHTML = '';
+      window.scrollTo({top:0,behavior:'smooth'});
     });
 
     status.textContent = 'Episode ready';
-
+    window.scrollTo({top:0,behavior:'smooth'});
   }catch(e){
+    console.error('openReader error', e);
     alert('Failed to load episode.');
     status.textContent = 'Error';
   }
 }
 
+// events
 qs('#searchBtn').addEventListener('click', doSearch);
 qs('#homeBtn').addEventListener('click', ()=>{qs('#q').value=''; loadHome();});
 qs('#q').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); doSearch(); }});
 
+// initial
 loadHome();
 </script>
-
 </body>
-</html>
+  </html>
