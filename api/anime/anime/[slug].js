@@ -1,40 +1,48 @@
-import { SITE, fetchHTML, parseHTML } from './_helpers.js';
-
 export default async function handler(req, res) {
   try {
-    let { slug } = req.query;
+    const { slug } = req.query;
+    const url = `https://otakudesu.best/anime/${slug}/`;
 
-    // ============================
-    //  AUTO FIX SLUG INPUT
-    // ============================
-    if (!slug) {
-      return res.status(400).json({ success: false, message: "Slug is required" });
-    }
+    const html = await fetch(url).then(r => r.text());
 
-    slug = decodeURIComponent(slug)
-      .replace(SITE, "")
-      .replace("https://", "")
-      .replace("http://", "")
-      .replace("otakudesu.best", "")
-      .replace("/anime/", "")
-      .replace(/\/+$/, "")     // remove trailing slash
-      .replace(/^\/+/, "")     // remove beginning slash
-      .trim();
+    // Title
+    const title = (html.match(/<h1[^>]*>(.*?)<\/h1>/)?.[1] || "").trim();
 
-    const url = `${SITE}/anime/${slug}/`;
+    // Image
+    const image = html.match(/<img[^>]+src="([^"]+)"[^>]*class="attachment-post-thumbnail"/)?.[1] || "";
 
-    // Fetch HTML
-    const html = await fetchHTML(url);
-    const $ = parseHTML(html);
+    // Synopsis
+    const synopsis = html.match(/<p>(.*?)<\/p>/s)?.[1].replace(/<[^>]+>/g,"").trim() || "";
 
-    // ============================
-    //  TITLE
-    // ============================
-    const title = $(".jdlrx h1").text().trim() ||
-                  $(".entry-title").text().trim() ||
-                  null;
+    // Genres
+    const genres = [...html.matchAll(/\/genre\/([^"]+)"/g)].map(m => m[1]);
 
-    // ============================
+    // Episodes
+    const episodes = [...html.matchAll(/<a href="([^"]+)"[^>]*class="epsleft">([^<]+)<\/a>/g)]
+      .map(m => ({
+        url: m[1],
+        title: m[2]
+      }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        title,
+        image,
+        synopsis,
+        genres,
+        episodes
+      }
+    });
+
+  } catch (e) {
+    console.error("DETAIL ERROR:", e);
+    return res.status(500).json({
+      success: false,
+      error: "SCRAPE_FAILED"
+    });
+  }
+}    // ============================
     //  IMAGE
     // ============================
     const image = $(".fotoanime img").attr("src") || null;
